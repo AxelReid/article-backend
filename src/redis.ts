@@ -26,7 +26,7 @@ export const redisSession = () => {
         maxAge: 1000 * 60 * 60 * 24 * 1, // 1 days
         httpOnly: true,
         sameSite: 'lax', // csrf
-        secure: false, //__prod__, // cookie works on https
+        secure: __prod__, // cookie works on https
         // domain: __prod__ ? '.domain.com' : undefined,
       },
       saveUninitialized: false,
