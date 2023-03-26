@@ -76,7 +76,6 @@ export class UserResolver {
       }
 
     req.session.userId = user.id
-    console.log('session: ------------------- ', req.session)
 
     return { user }
   }
