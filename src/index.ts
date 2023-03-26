@@ -1,5 +1,4 @@
 import 'reflect-metadata'
-import 'dotenv-safe/config'
 import { AppDataSource } from './orm.config'
 import express from 'express'
 import { ApolloServer } from 'apollo-server-express'

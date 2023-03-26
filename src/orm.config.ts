@@ -1,4 +1,3 @@
-import 'dotenv-safe/config'
 import { join } from 'path'
 import { DataSource, DataSourceOptions } from 'typeorm'
 import { __prod__ } from './constants'
