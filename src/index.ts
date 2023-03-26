@@ -18,12 +18,12 @@ const main = async () => {
   await AppDataSource.initialize().catch((err) =>
     console.log('TypeOrm init failed: ', err)
   )
-  await AppDataSource.runMigrations()
+  // await AppDataSource.runMigrations()
 
   const app = express()
 
   const { redis, session } = redisSession()
-  app.set('proxy', 1)
+  app.set('trust proxy', 1)
   app.use(session)
 
   const apolloServer = new ApolloServer({
@@ -40,14 +40,16 @@ const main = async () => {
         updootLoader: createUpdootLoader,
       },
     }),
+    cache: 'bounded',
     // plugins: [ApolloServerPluginLandingPageGraphQLPlayground],
   })
   app.use(
     cors({
-      origin: ['http://localhost:3000', 'https://studio.apollographql.com'], //process.env.CORS_ORIGIN,
+      origin: process.env.CORS_ORIGIN?.split(','),
       credentials: true,
     })
   )
+
   await apolloServer.start()
   apolloServer.applyMiddleware({ app, cors: false })
 

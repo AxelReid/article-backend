@@ -66,7 +66,16 @@ export class PostResolver {
     const realValue = value > 0 ? 1 : -1
     const vote = await UpDoot.findOneBy({ userId, postId })
 
-    const point = !vote ? realValue : -vote.value
+    const point =
+      // giving new point
+
+      !vote
+        ? realValue
+        : // removing the point
+        vote.value === realValue
+        ? -realValue
+        : // changing the point
+          realValue * 2
 
     const response: VoteResponse = {
       value: 0,
@@ -89,8 +98,16 @@ export class PostResolver {
         response.value = realValue
       }
 
-      await tm.getRepository(Post).increment({ id: postId }, 'points', point)
-      // TODO: after using Postgres, return inc value points adn return it
+      const res = await tm
+        .getRepository(Post)
+        .createQueryBuilder('post')
+        .update(Post)
+        .where(`id = ${postId}`)
+        .set({ points: () => `points + ${point}` })
+        .returning(['points'])
+        .execute()
+      // .increment({ id: postId }, 'points', point)
+      response.updatedPoints = res.raw[0].points
     })
     return response
   }
@@ -132,24 +149,6 @@ export class PostResolver {
         ...(cursor ? { createdAt: LessThan(new Date(cursor)) } : {}),
       },
     })
-
-    // const posts = await Post.createQueryBuilder('post')
-    //   .orderBy('post.createdAt', 'DESC')
-    //   .take(realLimitPlusOne)
-    //   .select([
-    //     'post.id id',
-    //     'post.title title',
-    //     'post.text text',
-    //     'post.creatorId creatorId',
-    //     'post.createdAt createdAt',
-    //     'post.updatedAt updatedAt',
-    //   ])
-    //   .where(cursor ? 'post.createdAt < :createdAt' : '', {
-    //     createdAt: new Date(cursor || ''),
-    //   })
-    //   .getRawMany()
-
-    // console.log(posts)
 
     return {
       posts: posts?.slice(0, realLimit),

@@ -1,0 +1,1 @@
+{"version":3,"file":"PaginatedPosts.js","sourceRoot":"","sources":["../../src/dto/PaginatedPosts.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,+CAAgD;AAChD,2CAAuC;AAGhC,IAAM,cAAc,GAApB,MAAM,cAAc;CAM1B,CAAA;AALC;IAAC,IAAA,oBAAK,EAAC,GAAG,EAAE,CAAC,CAAC,WAAI,CAAC,CAAC;;6CACP;AAEb;IAAC,IAAA,oBAAK,GAAE;;+CACQ;AALL,cAAc;IAD1B,IAAA,yBAAU,GAAE;GACA,cAAc,CAM1B;AANY,wCAAc"}
