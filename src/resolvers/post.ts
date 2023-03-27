@@ -1,6 +1,7 @@
 import { Post } from '../entities/Post'
 import {
   Arg,
+  Authorized,
   Ctx,
   FieldResolver,
   Int,
@@ -8,11 +9,9 @@ import {
   Query,
   Resolver,
   Root,
-  UseMiddleware,
 } from 'type-graphql'
 import { CreatePostInput } from '../dto/CreatePostInput'
 import { MyContext } from '../types'
-import { isAuth } from '../middlewares/isAuth'
 import { PaginatedPosts } from '../dto/PaginatedPosts'
 import { UpDoot } from '../entities/UpDoot'
 import { User } from '../entities/User'
@@ -20,49 +19,48 @@ import { VoteResponse } from '../dto/VoteResponse'
 import { UpdatePostInput } from '../dto/UpdatePostInput'
 import { LessThan } from 'typeorm'
 import { AppDataSource } from '../orm.config'
+import { ExtractUserId } from '../decorators/extractUserId'
 
 @Resolver(Post)
 export class PostResolver {
+  @Authorized()
   @Mutation(() => Post)
-  @UseMiddleware(isAuth)
   async createPost(
     @Arg('createPostInput') createPostInput: CreatePostInput,
-    @Ctx() { req }: MyContext
+    @Ctx() { userId }: MyContext
   ) {
     return Post.create({
       ...createPostInput,
-      creatorId: req.session.userId,
+      creatorId: userId,
     }).save()
   }
 
+  @Authorized()
   @Mutation(() => Post, { nullable: true })
-  @UseMiddleware(isAuth)
   async updatePost(
     @Arg('id', () => Int) id: number,
     @Arg('updatePostInput') updatePostInput: UpdatePostInput,
-    @Ctx() { req }: MyContext
+    @Ctx() { userId }: MyContext
   ): Promise<Post | null> {
     const post = await this.post(id)
-    if (post.creatorId !== req.session.userId)
-      throw new Error("You can't update!")
+    if (post.creatorId !== userId) throw new Error("You can't update!")
     return await Post.save({ ...post, ...updatePostInput })
   }
 
+  @Authorized()
   @Mutation(() => Boolean)
-  @UseMiddleware(isAuth)
-  async deletePost(@Arg('id') id: number, @Ctx() { req }: MyContext) {
-    const d = await Post.delete({ id, creatorId: req.session.userId })
+  async deletePost(@Arg('id') id: number, @Ctx() { userId }: MyContext) {
+    const d = await Post.delete({ id, creatorId: userId })
     return !!d.affected
   }
 
+  @Authorized()
   @Mutation(() => VoteResponse)
-  @UseMiddleware(isAuth)
   async vote(
     @Arg('postId', () => Int) postId: number,
     @Arg('value', () => Int) value: number,
-    @Ctx() { req }: MyContext
+    @Ctx() { userId }: MyContext
   ): Promise<VoteResponse> {
-    const { userId } = req.session
     const realValue = value > 0 ? 1 : -1
     const vote = await UpDoot.findOneBy({ userId, postId })
 
@@ -120,12 +118,14 @@ export class PostResolver {
   @FieldResolver(() => User)
   creator(@Root() root: Post, @Ctx() { loaders }: MyContext) {
     return loaders.userLoader.load(root.creatorId)
-    // return User.findOneBy({ id: root.creatorId })
   }
 
   @FieldResolver(() => Number)
-  async updoots(@Root() root: Post, @Ctx() { req, loaders }: MyContext) {
-    const userId = req.session.userId
+  async updoots(
+    @Root() root: Post,
+    @Ctx() { loaders }: MyContext,
+    @ExtractUserId() userId: number | null
+  ) {
     if (!userId) return { value: 0 }
 
     const updoots = await loaders.updootLoader.load({ postId: root.id, userId })
@@ -164,12 +164,14 @@ export class PostResolver {
   }
 
   @Query(() => Post, { nullable: true })
-  async postEdit(@Arg('id', () => Int) id: number, @Ctx() { req }: MyContext) {
-    const creatorId = req.session.userId
+  async postEdit(
+    @Arg('id', () => Int) id: number,
+    @ExtractUserId() userId: number
+  ) {
     const post = await Post.findOne({
       where: {
         id,
-        creatorId,
+        creatorId: userId,
       },
       select: {
         id: true,

@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import 'dotenv/config'
 import { AppDataSource } from './orm.config'
 import express from 'express'
 import { ApolloServer } from 'apollo-server-express'
@@ -7,10 +8,11 @@ import { PostResolver } from './resolvers/post'
 import { UserResolver } from './resolvers/user'
 import { __prod__ } from './constants'
 import { MyContext } from './types'
-import { redisSession } from './redis'
 import cors from 'cors'
 import { createUserLoader } from './loader/createUserLoader'
 import { createUpdootLoader } from './loader/createUpdootLoader'
+import { authChecker } from './decorators/authChecker'
+import { Redis } from 'ioredis'
 // import { ApolloServerPluginLandingPageGraphQLPlayground } from 'apollo-server-core'
 
 const main = async () => {
@@ -21,14 +23,16 @@ const main = async () => {
 
   const app = express()
 
-  const { redis, session } = redisSession()
+  // const { redis /*session*/ } = redisSession()
+  const redis = new Redis(process.env.REDIS_URL)
   app.set('trust proxy', 1)
-  app.use(session)
+  // app.use(session)
 
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
       resolvers: [PostResolver, UserResolver],
       validate: false,
+      authChecker,
     }),
     context: ({ req, res }): MyContext => ({
       req,

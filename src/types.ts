@@ -7,6 +7,7 @@ export type MyContext = {
   req: Request
   res: Response
   redis: Redis
+  userId?: number
   loaders: {
     userLoader: typeof createUserLoader
     updootLoader: typeof createUpdootLoader

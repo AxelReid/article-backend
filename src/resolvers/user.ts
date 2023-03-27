@@ -2,6 +2,7 @@ import { User } from '../entities/User'
 import { MyContext } from '../types'
 import {
   Arg,
+  Authorized,
   Ctx,
   FieldResolver,
   Mutation,
@@ -12,18 +13,19 @@ import {
 import { UserRegisterInput } from '../dto/UserRegisterInput'
 import argon2 from 'argon2'
 import { LoginResponse } from '../dto/LoginResponse'
-import { COOKIE_NAME, FORGOT_PASSWORD_PREFIX } from '../constants'
+import { FORGOT_PASSWORD_PREFIX } from '../constants'
 import { UserLoginInput } from '../dto/UserLoginInput'
 import { registerValidation } from '../utils/registerValidation'
 import { sendEmail } from '../utils/sendEmail'
 import { v4 } from 'uuid'
+import signJwtToken from '../utils/signJwtToken'
+import { ExtractUserId } from '../decorators/extractUserId'
 
 @Resolver(User)
 export class UserResolver {
   @Mutation(() => LoginResponse)
   async register(
-    @Arg('userRegisterInput') userRegisterInput: UserRegisterInput,
-    @Ctx() { req }: MyContext
+    @Arg('userRegisterInput') userRegisterInput: UserRegisterInput
   ): Promise<LoginResponse> {
     try {
       const errors = registerValidation(userRegisterInput)
@@ -32,13 +34,14 @@ export class UserResolver {
       const hashPass = await argon2.hash(userRegisterInput.password)
       userRegisterInput.password = hashPass
       const user = await User.create({ ...userRegisterInput }).save()
-      req.session.userId = user.id
-      return { user }
+      const token = signJwtToken(user.id)
+
+      return { user, token }
     } catch (error) {
-      const uniqueErr = error.message.includes('UNIQUE')
+      const uniqueErr = error.message.includes('duplicate key')
 
       if (uniqueErr) {
-        const nameErr = error.message.includes('user.username')
+        const nameErr = error?.detail?.includes('username')
         return {
           errors: [
             {
@@ -56,41 +59,20 @@ export class UserResolver {
 
   @Mutation(() => LoginResponse)
   async login(
-    @Arg('userLoginInput') { usernameOrEmail, password }: UserLoginInput,
-    @Ctx() { req }: MyContext
+    @Arg('userLoginInput') { usernameOrEmail, password }: UserLoginInput
   ): Promise<LoginResponse> {
     const user = await User.findOne({
       where: [{ email: usernameOrEmail }, { username: usernameOrEmail }],
     })
 
-    if (!user)
-      return {
-        errors: [
-          { field: 'usernameOrEmail', message: "The user doesn't exist" },
-        ],
-      }
+    const errMsg = "Can't login!"
+    if (!user) throw new Error(errMsg)
     const valid = await argon2.verify(user.password, password)
-    if (!valid)
-      return {
-        errors: [{ field: 'password', message: 'The password is incorrect' }],
-      }
+    if (!valid) throw new Error(errMsg)
 
-    req.session.userId = user.id
+    const token = signJwtToken(user.id)
 
-    return { user }
-  }
-
-  @Mutation(() => Boolean)
-  logout(@Ctx() { req, res }: MyContext) {
-    return new Promise((resolve) => {
-      req.session.destroy((err) => {
-        if (err) resolve(false)
-        else {
-          res.clearCookie(COOKIE_NAME)
-          resolve(true)
-        }
-      })
-    })
+    return { user, token }
   }
 
   @Mutation(() => Boolean)
@@ -127,7 +109,7 @@ export class UserResolver {
   async changePassword(
     @Arg('token') token: string,
     @Arg('newPassword') newPassword: string,
-    @Ctx() { redis, req }: MyContext
+    @Ctx() { redis }: MyContext
   ): Promise<LoginResponse> {
     if (newPassword.length <= 3)
       return {
@@ -147,8 +129,6 @@ export class UserResolver {
       const user = await User.findOneBy({ id: parseInt(userId) })
       if (!user) throw new Error("Can't change password!")
 
-      req.session.userId = user.id
-
       await User.update(
         { id: parseInt(userId) },
         { password: await argon2.hash(newPassword) }
@@ -160,9 +140,9 @@ export class UserResolver {
     }
   }
 
+  @Authorized()
   @Query(() => User, { nullable: true })
-  me(@Ctx() { req }: MyContext) {
-    const userId = req.session.userId
+  me(@Ctx() { userId }: MyContext) {
     if (!userId) return null
     return User.findOneBy({ id: userId })
   }
@@ -173,8 +153,8 @@ export class UserResolver {
   }
 
   @FieldResolver(() => String)
-  email(@Root() root: User, @Ctx() { req }: MyContext) {
-    if (req.session.userId === root.id) return root.email
+  email(@Root() root: User, @ExtractUserId() userId: number | null) {
+    if (userId === root.id) return root.email
     return 'hidden'
   }
 }

@@ -12,9 +12,12 @@ class FieldError {
 
 @ObjectType()
 export class LoginResponse {
-  @Field(() => [FieldError], { nullable: true })
-  errors?: FieldError[]
+  @Field(() => [FieldError] || String, { nullable: true })
+  errors?: FieldError[] | String
 
   @Field(() => User, { nullable: true })
   user?: User
+
+  @Field(() => String, { nullable: true })
+  token?: string
 }
