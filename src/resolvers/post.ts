@@ -112,7 +112,9 @@ export class PostResolver {
 
   @FieldResolver(() => String)
   textShort(@Root() root: Post) {
-    return root.text.slice(0, 50).trim() + (root.text.length > 50 ? ' ...' : '')
+    return (
+      root.text.slice(0, 150).trim() + (root.text.length > 50 ? ' ...' : '')
+    )
   }
 
   @FieldResolver(() => User)
